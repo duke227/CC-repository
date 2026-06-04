@@ -1,0 +1,5 @@
+{
+  "//": "跨机器共享的 Claude Code 全局设置",
+  "// 注意": "机器相关设置请放在 settings.local.json 中（不会被同步）",
+  "model": "claude-opus-4-8"
+}
