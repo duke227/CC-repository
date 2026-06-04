@@ -1,7 +1,7 @@
 #!/bin/bash
-# collect.sh - 将本机 ~/.claude/ 中的新内容收集到仓库
-# 在 git commit 之前运行此脚本
-# 用法: ./shared-claude-config/collect.sh
+# collect.sh - Copy local ~/.claude/* into the repo for sharing
+# Run BEFORE git commit when you have new sessions/memories/tasks
+# Usage: ./shared-claude-config/collect.sh
 
 set -e
 
@@ -9,12 +9,12 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CLAUDE_DIR="$HOME/.claude"
 SHARED_DIR="$REPO_ROOT/shared-claude-config"
 
-echo "=== 收集本机 Claude Code 配置 ==="
-echo "来源: $CLAUDE_DIR"
-echo "目标: $SHARED_DIR"
+echo "=== Collect Claude Code Data ==="
+echo "From: $CLAUDE_DIR"
+echo "To:   $REPO_ROOT"
 echo ""
 
-# 1. 收集 memory/
+# 1. Collect memory/
 if [ -d "$CLAUDE_DIR/memory" ]; then
     mkdir -p "$SHARED_DIR/memory"
     new_count=0
@@ -23,17 +23,15 @@ if [ -d "$CLAUDE_DIR/memory" ]; then
             basename=$(basename "$f")
             if [ ! -f "$SHARED_DIR/memory/$basename" ]; then
                 cp "$f" "$SHARED_DIR/memory/"
-                echo "[NEW] memory/$basename"
+                echo "  [NEW] memory/$basename"
                 new_count=$((new_count + 1))
             fi
         fi
     done
-    if [ $new_count -eq 0 ]; then
-        echo "[OK] memory/ - 无新文件"
-    fi
+    if [ $new_count -eq 0 ]; then echo "  [OK] memory/ - no new files"; fi
 fi
 
-# 2. 收集 scheduled-tasks/
+# 2. Collect scheduled-tasks/
 if [ -d "$CLAUDE_DIR/scheduled-tasks" ]; then
     mkdir -p "$SHARED_DIR/scheduled-tasks"
     new_count=0
@@ -42,19 +40,29 @@ if [ -d "$CLAUDE_DIR/scheduled-tasks" ]; then
             basename=$(basename "$d")
             if [ ! -d "$SHARED_DIR/scheduled-tasks/$basename" ]; then
                 cp -r "$d" "$SHARED_DIR/scheduled-tasks/"
-                echo "[NEW] scheduled-tasks/$basename"
+                echo "  [NEW] scheduled-tasks/$basename"
                 new_count=$((new_count + 1))
             fi
         fi
     done
-    if [ $new_count -eq 0 ]; then
-        echo "[OK] scheduled-tasks/ - 无新任务"
-    fi
+    if [ $new_count -eq 0 ]; then echo "  [OK] scheduled-tasks/ - no new tasks"; fi
+fi
+
+# 3. Collect sessions/ (overwrites same-name files)
+if [ -d "$CLAUDE_DIR/sessions" ]; then
+    mkdir -p "$REPO_ROOT/sessions"
+    synced=0
+    for f in "$CLAUDE_DIR/sessions"/*; do
+        if [ -f "$f" ]; then
+            cp "$f" "$REPO_ROOT/sessions/"
+            synced=$((synced + 1))
+        fi
+    done
+    echo "  [OK] sessions/ - collected ${synced} session(s)"
 fi
 
 echo ""
-echo "[提示] settings.json 和 keybindings.json 不会被自动收集。"
-echo "       如需更新，请直接编辑仓库中的文件："
-echo "       $SHARED_DIR/settings.json"
+echo "[Tip] settings.json and keybindings.json are NOT auto-collected."
+echo "      Edit them directly in the repo: $SHARED_DIR"
 echo ""
-echo "收集完成！请 review 变更后 commit 并 push。"
+echo "Done! Now run: git add -A && git commit -m 'update' && git push"

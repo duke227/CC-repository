@@ -1,46 +1,54 @@
-# Sync.ps1 - 将仓库中的共享配置同步到 ~/.claude/
-# 在 git pull 之后运行此脚本
-# 用法: .\shared-claude-config\sync.ps1
+# Sync.ps1 - Copy shared config from repo to ~/.claude/
+# Run AFTER git pull to apply changes from other computers
+# Usage: .\shared-claude-config\sync.ps1
 
 $ErrorActionPreference = "Stop"
-$RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$RepoRoot = Split-Path -Parent $PSScriptRoot
 $ClaudeDir = "$env:USERPROFILE\.claude"
 $SharedDir = "$PSScriptRoot"
 
-Write-Host "=== Claude Code 配置同步 ===" -ForegroundColor Cyan
-Write-Host "仓库: $RepoRoot"
-Write-Host "目标: $ClaudeDir"
+Write-Host "=== Claude Code Sync ===" -ForegroundColor Cyan
+Write-Host "Repo:   $RepoRoot"
+Write-Host "Target: $ClaudeDir"
 Write-Host ""
 
-# 确保 ~/.claude/ 目录存在
+# Ensure ~/.claude/ exists
 New-Item -ItemType Directory -Force -Path $ClaudeDir | Out-Null
 
-# 1. 同步 settings.json
+# 1. Sync settings.json
 if (Test-Path "$SharedDir\settings.json") {
     Copy-Item -Path "$SharedDir\settings.json" -Destination "$ClaudeDir\settings.json" -Force
-    Write-Host "[OK] settings.json" -ForegroundColor Green
+    Write-Host "  [OK] settings.json" -ForegroundColor Green
 }
 
-# 2. 同步 keybindings.json
+# 2. Sync keybindings.json
 if (Test-Path "$SharedDir\keybindings.json") {
     Copy-Item -Path "$SharedDir\keybindings.json" -Destination "$ClaudeDir\keybindings.json" -Force
-    Write-Host "[OK] keybindings.json" -ForegroundColor Green
+    Write-Host "  [OK] keybindings.json" -ForegroundColor Green
 }
 
-# 3. 同步 memory/ (合并：保留仓库中的文件 + 本地已有的文件)
+# 3. Sync memory/
 if (Test-Path "$SharedDir\memory") {
     New-Item -ItemType Directory -Force -Path "$ClaudeDir\memory" | Out-Null
     Copy-Item -Path "$SharedDir\memory\*" -Destination "$ClaudeDir\memory\" -Force
-    Write-Host "[OK] memory/" -ForegroundColor Green
+    Write-Host "  [OK] memory/" -ForegroundColor Green
 }
 
-# 4. 同步 scheduled-tasks/ (合并)
+# 4. Sync scheduled-tasks/
 if (Test-Path "$SharedDir\scheduled-tasks") {
     New-Item -ItemType Directory -Force -Path "$ClaudeDir\scheduled-tasks" | Out-Null
     Copy-Item -Path "$SharedDir\scheduled-tasks\*" -Destination "$ClaudeDir\scheduled-tasks\" -Force
-    Write-Host "[OK] scheduled-tasks/" -ForegroundColor Green
+    Write-Host "  [OK] scheduled-tasks/" -ForegroundColor Green
+}
+
+# 5. Sync sessions/ (from repo to local)
+if (Test-Path "$RepoRoot\sessions") {
+    New-Item -ItemType Directory -Force -Path "$ClaudeDir\sessions" | Out-Null
+    Copy-Item -Path "$RepoRoot\sessions\*" -Destination "$ClaudeDir\sessions\" -Force
+    $count = (Get-ChildItem "$RepoRoot\sessions" -File).Count
+    Write-Host "  [OK] sessions/ ($count session(s))" -ForegroundColor Green
 }
 
 Write-Host ""
-Write-Host "同步完成！" -ForegroundColor Cyan
-Write-Host "提示：如果你在本机创建了新的 memory 或定时任务，运行 collect.ps1 将它们收集到仓库中。" -ForegroundColor Yellow
+Write-Host "Sync complete!" -ForegroundColor Cyan
+Write-Host "Tip: Run collect.ps1 before git commit to save your latest sessions." -ForegroundColor Yellow
