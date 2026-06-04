@@ -1,6 +1,6 @@
 #!/bin/bash
-# sync.sh - Copy shared config from repo to ~/.claude/
-# Run AFTER git pull to apply changes from other computers
+# sync.sh - Restore shared CC data from repo to this machine
+# Run AFTER git pull to get sessions from other computers
 # Usage: ./shared-claude-config/sync.sh
 
 set -e
@@ -8,13 +8,17 @@ set -e
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CLAUDE_DIR="$HOME/.claude"
 SHARED_DIR="$REPO_ROOT/shared-claude-config"
+LOCAL_CWD="$(pwd)"
+
+# Encode path the way CC does
+LOCAL_ENCODED="$(echo "$LOCAL_CWD" | sed 's/[:\\]/-/g')"
 
 echo "=== Claude Code Sync ==="
 echo "Repo:   $REPO_ROOT"
 echo "Target: $CLAUDE_DIR"
+echo "Path:   $LOCAL_ENCODED"
 echo ""
 
-# Ensure ~/.claude/ exists
 mkdir -p "$CLAUDE_DIR"
 
 # 1. Sync settings.json
@@ -43,12 +47,40 @@ if [ -d "$SHARED_DIR/scheduled-tasks" ]; then
     echo "  [OK] scheduled-tasks/"
 fi
 
-# 5. Sync sessions/ (from repo to local)
+# 5. Sync sessions/ with cwd fix
 if [ -d "$REPO_ROOT/sessions" ]; then
     mkdir -p "$CLAUDE_DIR/sessions"
-    cp -r "$REPO_ROOT/sessions/"* "$CLAUDE_DIR/sessions/" 2>/dev/null || true
-    count=$(ls -1 "$REPO_ROOT/sessions" 2>/dev/null | wc -l)
-    echo "  [OK] sessions/ (${count} session(s))"
+    session_count=0
+    for f in "$REPO_ROOT/sessions"/*; do
+        if [ -f "$f" ]; then
+            basename=$(basename "$f")
+            # Update cwd to match THIS machine's path using sed
+            sed "s|\"cwd\":\"[^\"]*\"|\"cwd\":\"$LOCAL_CWD\"|g" "$f" > "$CLAUDE_DIR/sessions/$basename"
+            session_count=$((session_count + 1))
+        fi
+    done
+    echo "  [OK] sessions/ - ${session_count} session(s)"
+fi
+
+# 6. Merge projects/ - combine conversations from ALL machines
+#    Each machine stores under its own encoded path, so we merge all into this machine's dir
+if [ -d "$REPO_ROOT/projects" ]; then
+    local_proj="$CLAUDE_DIR/projects/$LOCAL_ENCODED"
+    mkdir -p "$local_proj"
+    merged_count=0
+    machine_count=0
+    for remote_dir in "$REPO_ROOT/projects"/*/; do
+        if [ -d "$remote_dir" ]; then
+            machine_count=$((machine_count + 1))
+            for jsonl in "$remote_dir"*.jsonl; do
+                if [ -f "$jsonl" ]; then
+                    cp "$jsonl" "$local_proj/"
+                    merged_count=$((merged_count + 1))
+                fi
+            done
+        fi
+    done
+    echo "  [OK] projects/ - merged ${merged_count} conversation(s) from ${machine_count} machine(s)"
 fi
 
 echo ""

@@ -9,9 +9,8 @@ session-env/
 settings.local.json
 credentials.json
 
-# 日志和临时文件
-*.log
-*.tmp
+# Exclude large cached tool outputs (can be regenerated)
+projects/*/tool-results/
 
 # 操作系统文件
 .DS_Store
